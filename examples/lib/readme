@@ -1,0 +1,8 @@
+shared libraries:
+
+compile with -fPIC option in gcc, then use the -shared flag when linking.
+
+example for libhello.so
+ensure CFLAGS has -L<path_to_libhello.so> -l<hello>
+
+if libhello.so in system shared library directories (i.e., /usr/lib or /usr/bin/ld), then no need for -L switch
