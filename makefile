@@ -5,11 +5,11 @@
 # mailto:chia_jason96@live.com
 
 # TODO: project name
-PROJECT := libhello
+PROJECT := hello-starter
 
 # TODO: source directories
 #SRC_DIR := src
-SRC_DIR := examples/lib
+SRC_DIR := examples/basic
 
 # TODO: example cflags
 CFLAGS += \
@@ -22,7 +22,7 @@ SRC_C := $(wildcard  $(SRC_DIR)/*.c)
 INC := $(SRC_DIR)
 
 # TODO: libraries to link
-LIBS := -lpam -lpam_misc -lm \
+#LIBS := -lpam -lpam_misc -lm \
 	#build/libhello.a
 	#-Lbuild -lhello
 
