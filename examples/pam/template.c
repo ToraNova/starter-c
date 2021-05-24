@@ -8,10 +8,14 @@
  * mailto: chia_jason96@live.com
  */
 #include <pwd.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <security/pam_appl.h>
+#include <security/pam_ext.h>
 #include <security/pam_modules.h>
+#include <security/pam_modutil.h>
 
 /*
  * defined in pwd.h
@@ -31,19 +35,21 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
 	// TODO: handle authentication code here
 	// flags: PAM_SILENT, PAM_DISALLOW_NULL_AUTHTOK
 	char *user = NULL; //variable to store username
-	struct passwd *pdat; // /etc/passwd data struct
-	uid_t euid;
 	int rc;
 
-	// get username, 3rd arg is prompt "login: "(default).
+	// get username, 3rd arg is prompt "login:" (default).
 	rc = pam_get_user(pamh, (const char **) &user, NULL);
 	if (rc != PAM_SUCCESS || user == NULL) {
 		// username error
 		return PAM_USER_UNKNOWN;
 	}
 
+	// allow actual linux-users to authenticate only (they exist in /etc/passwd)
+#if 0
+	uid_t euid; // program effective uid
+	struct passwd *pdat; // /etc/passwd data struct
 	// get passwd struct from /etc/passwd corresponding to username
-	pdat = pam_modutil_getpwname(pamh, user);
+	pdat = pam_modutil_getpwnam(pamh, user);
 	if (pdat == NULL) {
 		// no pwd data in /etc/passwd (probably not a valid linux user)
 		return PAM_USER_UNKNOWN;
@@ -54,16 +60,17 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
 	if(getuid() != euid || euid == 0 ){
 		rc = seteuid(pdat->pw_uid); //drop privilege to user's privilege
 		if (!rc){
-			fprintf(stderr, "error dropping privs from %d to %d", euid, uid);
-			return PAM_AUTH_ERR
+			perror("seteuid");
+			return PAM_AUTH_ERR;
 		}
 		//rmb to reset euid back to original 'euid'
 	}
+#endif
 
 	//TODO: authentication here
 	// password based
-	const char *token = NULL; //user to supply token
-	rc = pam_get_authtok(pamh, PAM_AUTHTOK, &token, "token: ");
+	char *token = NULL; //user to supply token
+	rc = pam_get_authtok(pamh, PAM_AUTHTOK, (const char **) &token, "token:");
 	if(rc != PAM_SUCCESS) {
 		// error getting auth token
 		return PAM_AUTH_ERR;
@@ -92,38 +99,22 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
 	// TODO: handle access control code here
 	// flags: PAM_SILENT, PAM_DISALLOW_NULL_AUTHTOK
-	// this struct contains the expiry date of the account
-	// this is an arbitrary date and serve as example only!
-	struct tm expiry_date;
-	expiry_date.tm_mday = 24;
-	expiry_date.tm_mon = 5;
-	expiry_date.tm_year = 2021;
-	expiry_date.tm_sec = 0;
-	expiry_date.tm_min = 0;
-	expiry_date.tm_hour = 0;
-
-	time_t expiry_time;
-	time_t current_time;
 	char *user = NULL;
 
-	// getting time_t value for expiry_date and current date
-	expiry_time = mktime(&expiry_date);
-	current_time = time(NULL);
-
-	if (current_time > expiry_time) {
+	// arbitrary security access controls.
+	// in this example:
+	// only user named 'cjason' can login
+	// account 'expired' is expired (you should obviously implement your own expiry check)
+	pam_get_item(pamh, PAM_USER, (const void **)&user); //get user name from PAM
+	if (strcmp(user, "cjason") == 0){
+		// ok
+		return PAM_SUCCESS;
+	}else if(strcmp(user, "expired") == 0){
 		// account expired
 		return PAM_ACCT_EXPIRED;
-	}
-
-	// arbitrary security access controls
-	// (i.e., only the user named 'cjason' can login access
-
-	pam_get_item(pamh, PAM_USER, (const void **)&user); //get user name from PAM
-	if (strcmp(user, "cjason")){
+	}else{
 		return PAM_PERM_DENIED;
 	}
-
-	return PAM_SUCCESS;
 }
 
 // PAM entry point for session creation

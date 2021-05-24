@@ -22,7 +22,8 @@ SRC_C := $(wildcard  $(SRC_DIR)/*.c)
 INC := $(SRC_DIR)
 
 # TODO: libraries to link
-#LIBS := -lpam -lpam_misc -lm \
+#LIBS := -lpam -lpam_misc \
+	#-lm \
 	#build/libhello.a
 	#-Lbuild -lhello
 

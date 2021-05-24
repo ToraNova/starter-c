@@ -3,13 +3,18 @@
  * PAM - pluggable authentication modules
  * a method of unifying authentication, account, sessions and password controls.
  * https://web.archive.org/web/20190420073246/https://fedetask.com/writing-a-linux-pam-aware-application/
- * requires a configuration file in /etc/pam.d/pam_example
- * auth        required        pam_unix.so
- * account     required        pam_unix.so
- * password    required        pam_unix.so
+ * requires a configuration file in /etc/pam.d/<pamc>
+ * auth        required        <pam_name>.so
+ * account     required        <pam_name>.so
+ * password    required        <pam_name>.so
+ * session     required        <pam_name>.so
+ *
+ * <pam_name> is any pam that is installed under /usr/lib/security
+ * (i.e., pam_unix);
+ *
+ * this example mainly is on auth/account only. please find additional info on password/session.
  *
  * toranova, May 19 2021
- *
  * compile with:
  * gcc -o run main.c -lpam -lpam_misc
  */
@@ -24,41 +29,50 @@ static struct pam_conv conv = {
 };
 
 int main() {
-	pam_handle_t *handle = NULL;
-	const char *service_name = "pam_example";
-	int retval;
-	char *username;
+	pam_handle_t *pamh = NULL;
+	const char *pamc = "pam_example"; //config name under /etc/pam.d
+	int rc;
+	char *user;
 
-	retval = pam_start(service_name, NULL, &conv, &handle);
-	if (retval != PAM_SUCCESS){
-		fprintf(stderr, "failure in pam initialization: %s\n", pam_strerror(handle, retval));
-		return 1;
+	rc = pam_start(pamc, NULL, &conv, &pamh);
+	if (rc != PAM_SUCCESS){
+		fprintf(stderr, "failure in pam initialization: %s\n", pam_strerror(pamh, rc));
+		return -1;
 	}
 
-	retval = pam_authenticate(handle, 0); // do authentication (user will be asked for username and password)
-	if (retval != PAM_SUCCESS) {
-		fprintf(stderr, "failure in pam authentication: %s\n", pam_strerror(handle, retval));
-		return 1;
+	rc = pam_authenticate(pamh, 0); // do authentication (user will be asked for user and password)
+	if (rc != PAM_SUCCESS) {
+		fprintf(stderr, "failure in pam authentication: %s\n", pam_strerror(pamh, rc));
+		return -1;
 	}
 
-	retval = pam_acct_mgmt(handle, 0); // do account management (check the account can access the system)
-	if (retval != PAM_SUCCESS) {
-		fprintf(stderr, "failure in pam account management: %s\n", pam_strerror(handle, retval));
-		return 1;
+	rc = pam_get_item(pamh, PAM_USER, (const void **)&user);
+	if (rc != PAM_SUCCESS || user == NULL){
+		fprintf(stderr, "failure to get user: %s\n", pam_strerror(pamh, rc));
+		return -1;
 	}
+	printf("pam auth %s ok.\n", user);
 
-	pam_get_item(handle, PAM_USER, (const void **)&username);
-	printf("welcome, %s\n", username);
+	rc = pam_acct_mgmt(pamh, 0); // do account management (check the account can access the system)
+	if (rc != PAM_SUCCESS) {
+		fprintf(stderr, "failure in pam account management: %s\n", pam_strerror(pamh, rc));
+		return -1;
+	}
+	printf("pam account %s ok.\n", user);
 
+	// password changing
+#if 0
 	printf("do you want to change your password? (answer y/n): ");
 	char answer = getc(stdin); // get user answer
 	if (answer == 'y') {
-		retval = pam_chauthtok(handle, 0); // do update (user will be asked for current and new password) */
-		if (retval != PAM_SUCCESS) {
-			fprintf(stderr, "failure in pam password: %s\n", pam_strerror(handle, retval));
+		rc = pam_chauthtok(pamh, 0); // do update (user will be asked for current and new password) */
+		if (rc != PAM_SUCCESS) {
+			fprintf(stderr, "failure in pam password: %s\n", pam_strerror(pamh, rc));
 			return 1;
 		}
 	}
+#endif
 
-	pam_end(handle, retval); // ALWAYS terminate the pam transaction!
+	pam_end(pamh, rc); // ALWAYS terminate the pam transaction!
+	return 0;
 }
